@@ -22,7 +22,7 @@ script:
  - ARCH=x86_64 CC=mpicc MPICH_CC=clang CFLAGS="-g -O0 -fprofile-arcs -ftest-coverage" cmake -DCMAKE_BUILD_TYPE=Debug -DROSS_BUILD_MODELS=ON ..
  - make
  - CTEST_OUTPUT_ON_FAILURE=1 make test
- - find . -name "*.gcda" -or -name "*.gcno" -exec gcov {} \;
+ - find . -name "*.gcda" -or -name "*.gcno" -exec llvm-cov {} \;
 after_success:
   - bash <(curl -s https://codecov.io/bash)
   - ## the following automatically builds the doxygen
