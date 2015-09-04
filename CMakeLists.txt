@@ -6,6 +6,8 @@ CMAKE_MINIMUM_REQUIRED(VERSION 2.8)
 ENABLE_TESTING()
 INCLUDE(CTest)
 
+INCLUDE(CodeCoverage)
+
 LIST(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/core/cmake/")
 
 # Data Structure for Unprocessed Event List
