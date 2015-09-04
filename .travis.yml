@@ -19,10 +19,10 @@ script:
  - CTEST_OUTPUT_ON_FAILURE=1 make test
  - cd ..
  - mkdir build && cd build
- - ARCH=x86_64 CC=mpicc MPICH_CC=clang cmake -DCOVERALLS=ON -DCMAKE_BUILD_TYPE=Debug -DROSS_BUILD_MODELS=ON ..
+ - ARCH=x86_64 CC=mpicc MPICH_CC=clang CFLAGS="-g -O0 -fprofile-arcs -ftest-coverage" cmake -DCMAKE_BUILD_TYPE=Debug -DROSS_BUILD_MODELS=ON ..
  - make
  - CTEST_OUTPUT_ON_FAILURE=1 make test
- - make coveralls
+ - find . -name "*.gcda" -or -name "*.gcno" -exec gcov-mp-4.8 {} \;
 after_success:
   - bash <(curl -s https://codecov.io/bash)
   - ## the following automatically builds the doxygen
