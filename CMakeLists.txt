@@ -89,7 +89,8 @@ ENDIF(ARCH STREQUAL ppc64)
 
 IF(ARCH STREQUAL ppc64le)
   SET(VALID_ARCH YES)
-  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O5 -qprefetch=aggressive -qarch=pwr9 -qtune=auto -qmaxmem=-1 -qsimd=noauto -qhot")
+  #SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O5 ")#-qprefetch=aggressive")# -qarch=pwr9")# -qtune=auto -qmaxmem=-1 -qsimd=noauto -qhot")
+  SET(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O3 -qarch=pwr9 -qmaxmem=-1 -qsimd=noauto -qhot") 
   SET(CLOCK ppc64le)
 ENDIF(ARCH STREQUAL ppc64le)
 
