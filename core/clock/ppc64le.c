@@ -1,7 +1,6 @@
 #include <ross.h>
 
-// rest from default to 512MHz as that's the timebase for the POWER9 system.
-extern tw_stime g_tw_clock_rate = 512000000.0;
+extern tw_stime g_tw_clock_rate;
 
 static const tw_optdef clock_opts [] =
 {
@@ -12,6 +11,8 @@ static const tw_optdef clock_opts [] =
 
 const tw_optdef *tw_clock_setup(void)
 {
+	//reset from default to 512MHz as that's the timebase for the POWER9 system
+	g_tw_clock_rate = 512000000.0;
 	return clock_opts;
 }
 
