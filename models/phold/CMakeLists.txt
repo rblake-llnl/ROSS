@@ -11,6 +11,7 @@ ENDIF(BGPM)
 SET(phold_srcs
 phold.c		phold.h)
 
+SET_SOURCE_FILES_PROPERTIES(${phold_srcs} PROPERTIES LANGUAGE CXX)
 
 ADD_EXECUTABLE(phold ${phold_srcs})
 ADD_EXECUTABLE(phold_test ${phold_srcs})
