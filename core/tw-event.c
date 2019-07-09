@@ -7,6 +7,17 @@ static inline void link_causality (tw_event *nev, tw_event *cev) {
 }
 
 static inline void event_send(tw_event* event) {
+    tw_lp     *src_lp = event->src_lp;
+    tw_pe     *send_pe = src_lp->pe;
+    tw_pe     *dest_pe = NULL;
+    tw_clock pq_start, net_start;
+
+    tw_peid        dest_peid = -1;
+    tw_stime   recv_ts = event->recv_ts;
+
+    // call LP remote mapping function to get dest_pe
+    dest_peid = (*src_lp->type->map) ((tw_lpid) event->dest_lp);
+
     if (dest_peid == g_tw_mynode) {
         event->dest_lp = tw_getlocal_lp((tw_lpid) event->dest_lp);
         dest_pe = event->dest_lp->pe;
@@ -97,7 +108,8 @@ void tw_event_send(tw_event * event) {
     }
 
     link_causality(event, send_pe->cur_event);
-
+    
+    event_send(event);
 }
 
 static inline void local_cancel(tw_pe *d, tw_event *event) {
