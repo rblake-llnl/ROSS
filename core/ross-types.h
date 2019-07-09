@@ -262,7 +262,6 @@ struct tw_event {
     tw_event *cause_next;           /**< @brief Next in parent's caused_by_me chain */ //RCB_OK
     tw_event *rescinded_by_me;      /**< @brief Start of event list rescinded by this event */
     tw_event *rescind_next;         /**< @brief Next in parent's rescinded_by_me chain */
-    int is_rescinded;              /**< @brief True if event is sitting in someone's rescind list */
    
     tw_eventid   event_id;          /**< @brief Unique id assigned by src_lp->pe if remote. */
 
@@ -270,6 +269,7 @@ struct tw_event {
     struct {
         unsigned char owner;        /**< @brief Owner of the next/prev pointers; see tw_event_owner */
         unsigned char cancel_q;     /**< @brief Actively on a dest_lp->pe's cancel_q */
+        unsigned char is_rescinded; /**< @brief True if event is sitting in someone's rescind list */
         unsigned char cancel_asend;
         unsigned char remote;       /**< @brief Indicates union addr is in 'remote' storage */
     } state;

@@ -107,7 +107,7 @@ tw_init_lps(tw_pe * me)
 			me->cur_event = me->abort_event;
 			me->cur_event->caused_by_me = NULL;
                         me->cur_event->rescinded_by_me = NULL;
-                        me->cur_event->is_rescinded = NULL;
+                        me->cur_event->state.is_rescinded = 0;
                         
 			(*(init_f)lp->type->init) (lp->cur_state, lp);
 

@@ -163,7 +163,7 @@ static inline void event_cancel(tw_event * event) {
                 pq_start = tw_clock_read();
                 tw_pq_delete_any(send_pe->pq, event);
                 send_pe->stats.s_pq += tw_clock_read() - pq_start;
-                if (! event->is_rescinded) {
+                if (! event->state.is_rescinded) {
                     tw_event_free(send_pe, event);
                 }
                 break;
@@ -203,7 +203,7 @@ static inline void event_cancel(tw_event * event) {
     event->rescind_next = send_pe->cur_event->rescinded_by_me;
     send_pe->cur_event->rescinded_by_me = event;
  
-    event->is_rescinded = 1;
+    event->state.is_rescinded = 1;
     event_cancel(event);
 }
 
@@ -270,7 +270,7 @@ jump_over_rc_event_handler:
         tw_event *n = e->rescind_next;
         e->rescind_next = NULL;
 
-        e->is_rescinded = 0;
+        e->state.is_rescinded = 0;
         event_send(e);
         e = n;
     }

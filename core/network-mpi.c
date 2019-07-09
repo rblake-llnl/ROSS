@@ -363,7 +363,7 @@ recv_finish(tw_pe *me, tw_event *e, char * buffer)
   e->cause_next = NULL;
   e->rescinded_by_me = NULL;
   e->rescind_next = NULL;
-  e->is_rescinded = 0;
+  e->state.is_rescinded = 0;
 
 
   if(e->recv_ts < me->GVT)
@@ -542,7 +542,7 @@ send_finish(tw_pe *me, tw_event *e, char * buffer)
      * for this event.  We need to free the buffer and
      * make it available for reuse.
      */
-    if (! e->is_rescinded) {
+    if (! e->state.is_rescinded) {
       tw_event_free(me, e);
     } else {
       e->state.owner = TW_pe_sevent_q;
@@ -622,7 +622,7 @@ tw_net_cancel(tw_event *e)
      * buffer back into our own free list.
      */
     tw_eventq_delete_any(&outq, e);
-    if (! e->is_rescinded) { //RCB Fix Owner
+    if (! e->state.is_rescinded) { //RCB Fix Owner
        tw_event_free(src_pe, e);
     }
 
