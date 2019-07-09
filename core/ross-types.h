@@ -259,8 +259,11 @@ struct tw_event {
 
     tw_event *cancel_next;          /**< @brief Next event in the cancel queue for the dest_pe */
     tw_event *caused_by_me;         /**< @brief Start of event list caused by this event */
-    tw_event *cause_next;           /**< @brief Next in parent's caused_by_me chain */
-
+    tw_event *cause_next;           /**< @brief Next in parent's caused_by_me chain */ //RCB_OK
+    tw_event *rescinded_by_me;      /**< @brief Start of event list rescinded by this event */
+    tw_event *rescind_next;         /**< @brief Next in parent's rescinded_by_me chain */
+    int is_rescinded;              /**< @brief True if event is sitting in someone's rescind list */
+   
     tw_eventid   event_id;          /**< @brief Unique id assigned by src_lp->pe if remote. */
 
     /** Status of the event's queue location(s). */
@@ -384,7 +387,7 @@ struct tw_pe {
     tw_eventq free_q; /**< @brief Linked list of free tw_events */
     tw_event *abort_event; /**< @brief Placeholder event for when free_q is empty */
     tw_event *cur_event; /**< @brief Current event being processed */
-    tw_eventq sevent_q; /**< @brief events already sent over the network */
+    //tw_eventq sevent_q; /**< @brief events already sent over the network */
 
     unsigned char *delta_buffer[3]; /**< @brief buffers used for delta encoding */
 

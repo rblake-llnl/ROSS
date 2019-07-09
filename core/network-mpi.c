@@ -361,7 +361,9 @@ recv_finish(tw_pe *me, tw_event *e, char * buffer)
   e->cancel_next = NULL;
   e->caused_by_me = NULL;
   e->cause_next = NULL;
-
+  e->rescinded_by_me = NULL;
+  e->rescind_next = NULL;
+  e->is_rescinded = 0;
 
 
   if(e->recv_ts < me->GVT)
@@ -540,7 +542,11 @@ send_finish(tw_pe *me, tw_event *e, char * buffer)
      * for this event.  We need to free the buffer and
      * make it available for reuse.
      */
-    tw_event_free(me, e);
+    if (! e->is_rescinded) {
+      tw_event_free(me, e);
+    } else {
+      e->state.owner = TW_pe_sevent_q;
+    }
     return;
   }
 
@@ -591,6 +597,8 @@ tw_net_send(tw_event *e)
   tw_pe * me = e->src_lp->pe;
   int changed = 0;
 
+  //RCB FIXME-- if we cancel a rescind but the rescind hasn't been
+  //sent yet, we can just anniliate the rescind and this message.
   e->state.remote = 0;
   e->state.owner = TW_net_outq;
   tw_eventq_unshift(&outq, e);
@@ -614,7 +622,9 @@ tw_net_cancel(tw_event *e)
      * buffer back into our own free list.
      */
     tw_eventq_delete_any(&outq, e);
-    tw_event_free(src_pe, e);
+    if (! e->is_rescinded) { //RCB Fix Owner
+       tw_event_free(src_pe, e);
+    }
 
     return;
 

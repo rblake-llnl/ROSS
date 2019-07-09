@@ -106,7 +106,9 @@ tw_init_lps(tw_pe * me)
 		{
 			me->cur_event = me->abort_event;
 			me->cur_event->caused_by_me = NULL;
-
+                        me->cur_event->rescinded_by_me = NULL;
+                        me->cur_event->is_rescinded = NULL;
+                        
 			(*(init_f)lp->type->init) (lp->cur_state, lp);
 
 			if (me->cev_abort)
@@ -156,7 +158,8 @@ void tw_pre_run_lps (tw_pe * me) {
 		if (lp->type->pre_run) {
 			me->cur_event = me->abort_event;
 			me->cur_event->caused_by_me = NULL;
-
+                        me->cur_event->rescinded_by_me = NULL;
+                        
 			(*(pre_run_f)lp->type->pre_run) (lp->cur_state, lp);
 
 			if (me->cev_abort)

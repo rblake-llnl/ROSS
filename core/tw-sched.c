@@ -101,11 +101,15 @@ static void tw_sched_cancel_q(tw_pe * me) {
                     */
                     tw_eventq_delete_any(&me->event_q, cev);
 
-                    tw_event_free(me, cev);
+                    if (! cev->is_rescinded) {
+                        tw_event_free(me, cev);
+                    }
                     break;
 
                 case TW_pe_anti_msg:
-                    tw_event_free(me, cev);
+                    if (! cev->is_rescinded) {
+                        tw_event_free(me, cev);
+                    }
                     break;
 
                 case TW_pe_pq:
@@ -116,7 +120,9 @@ static void tw_sched_cancel_q(tw_pe * me) {
                     pq_start = tw_clock_read();
                     tw_pq_delete_any(me->pq, cev);
                     me->stats.s_pq += tw_clock_read() - pq_start;
-                    tw_event_free(me, cev);
+                    if (! cev->is_rescinded) {
+                        tw_event_free(me, cev);
+                    }
                     break;
 
                 case TW_kp_pevent_q:
@@ -124,7 +130,9 @@ static void tw_sched_cancel_q(tw_pe * me) {
                     * SECONDARY ROLLBACK
                     */
                     tw_kp_rollback_event(cev);
-                    tw_event_free(me, cev);
+                    if (! cev->is_rescinded) {
+                       tw_event_free(me, cev);
+                    }
                     break;
 
                 default:

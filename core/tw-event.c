@@ -6,6 +6,50 @@ static inline void link_causality (tw_event *nev, tw_event *cev) {
     cev->caused_by_me = nev;
 }
 
+static inline void event_send(tw_event* event) {
+    if (dest_peid == g_tw_mynode) {
+        event->dest_lp = tw_getlocal_lp((tw_lpid) event->dest_lp);
+        dest_pe = event->dest_lp->pe;
+
+        if (send_pe == dest_pe && event->dest_lp->kp->last_time <= recv_ts) {
+            /* Fast case, we are sending to our own PE and there is
+            * no rollback caused by this send.  We cannot have any
+            * transient messages on local sends so we can return.
+            */
+            pq_start = tw_clock_read();
+            tw_pq_enqueue(send_pe->pq, event);
+            send_pe->stats.s_pq += tw_clock_read() - pq_start;
+            return;
+        } else {
+            /* Slower, but still local send, so put into top of
+            * dest_pe->event_q.
+            */
+            event->state.owner = TW_pe_event_q;
+
+            tw_eventq_push(&dest_pe->event_q, event);
+
+            if(send_pe != dest_pe) {
+                send_pe->stats.s_nsend_loc_remote++;
+            }
+        }
+    } else {
+        /* Slowest approach of all; this is not a local event.
+        * We need to send it over the network to the other PE
+        * for processing.
+        */
+        send_pe->stats.s_nsend_net_remote++;
+        //event->src_lp->lp_stats->s_nsend_net_remote++;
+        event->state.owner = TW_net_asend;
+        net_start = tw_clock_read();
+        tw_net_send(event);
+        send_pe->stats.s_net_other += tw_clock_read() - net_start;
+    }
+
+    if(tw_gvt_inprogress(send_pe)) {
+        send_pe->trans_msg_ts = ROSS_MIN(send_pe->trans_msg_ts, recv_ts);
+    }
+}
+   
 void tw_event_send(tw_event * event) {
     tw_lp     *src_lp = event->src_lp;
     tw_pe     *send_pe = src_lp->pe;
@@ -54,47 +98,6 @@ void tw_event_send(tw_event * event) {
 
     link_causality(event, send_pe->cur_event);
 
-    if (dest_peid == g_tw_mynode) {
-        event->dest_lp = tw_getlocal_lp((tw_lpid) event->dest_lp);
-        dest_pe = event->dest_lp->pe;
-
-        if (send_pe == dest_pe && event->dest_lp->kp->last_time <= recv_ts) {
-            /* Fast case, we are sending to our own PE and there is
-            * no rollback caused by this send.  We cannot have any
-            * transient messages on local sends so we can return.
-            */
-            pq_start = tw_clock_read();
-            tw_pq_enqueue(send_pe->pq, event);
-            send_pe->stats.s_pq += tw_clock_read() - pq_start;
-            return;
-        } else {
-            /* Slower, but still local send, so put into top of
-            * dest_pe->event_q.
-            */
-            event->state.owner = TW_pe_event_q;
-
-            tw_eventq_push(&dest_pe->event_q, event);
-
-            if(send_pe != dest_pe) {
-                send_pe->stats.s_nsend_loc_remote++;
-            }
-        }
-    } else {
-        /* Slowest approach of all; this is not a local event.
-        * We need to send it over the network to the other PE
-        * for processing.
-        */
-        send_pe->stats.s_nsend_net_remote++;
-        //event->src_lp->lp_stats->s_nsend_net_remote++;
-        event->state.owner = TW_net_asend;
-        net_start = tw_clock_read();
-        tw_net_send(event);
-        send_pe->stats.s_net_other += tw_clock_read() - net_start;
-    }
-
-    if(tw_gvt_inprogress(send_pe)) {
-        send_pe->trans_msg_ts = ROSS_MIN(send_pe->trans_msg_ts, recv_ts);
-    }
 }
 
 static inline void local_cancel(tw_pe *d, tw_event *event) {
@@ -148,7 +151,9 @@ static inline void event_cancel(tw_event * event) {
                 pq_start = tw_clock_read();
                 tw_pq_delete_any(send_pe->pq, event);
                 send_pe->stats.s_pq += tw_clock_read() - pq_start;
-                tw_event_free(send_pe, event);
+                if (! event->is_rescinded) {
+                    tw_event_free(send_pe, event);
+                }
                 break;
 
             case TW_pe_event_q:
@@ -176,6 +181,18 @@ static inline void event_cancel(tw_event * event) {
     } else {
         tw_error(TW_LOC, "Should be remote cancel!");
     }
+}
+
+ void tw_event_cancel(tw_event *event) {
+    tw_pe *send_pe = event->src_lp->pe;
+    
+    tw_free_output_messages(event, 0); //RCB_FIXME, check if this is right?
+    
+    event->rescind_next = send_pe->cur_event->rescinded_by_me;
+    send_pe->cur_event->rescinded_by_me = event;
+ 
+    event->is_rescinded = 1;
+    event_cancel(event);
 }
 
 void tw_event_rollback(tw_event * event) {
@@ -236,6 +253,16 @@ jump_over_rc_event_handler:
 
     event->caused_by_me = NULL;
 
+    e = event->rescinded_by_me;
+    while (e) {
+        tw_event *n = e->rescind_next;
+        e->rescind_next = NULL;
+
+        e->is_rescinded = 0;
+        event_send(e);
+        e = n;
+    }
+    
     dest_lp->kp->s_e_rbs++;
     // instrumentation
     dest_lp->kp->kp_stats->s_e_rbs++;
