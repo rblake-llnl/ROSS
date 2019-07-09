@@ -217,11 +217,10 @@ enum tw_event_owner {
     TW_pe_anti_msg = 4,     /**< @brief Anti-message */
     TW_net_outq = 5,        /**< @brief Pending network transmission */
     TW_net_asend = 6,       /**< @brief Network transmission in progress */
-    TW_net_acancel = 7,     /**< @brief Network transmission in progress */
-    TW_pe_sevent_q = 8,     /**< @brief In tw_pe.sevent_q */
-    TW_pe_free_q = 9,       /**< @brief In tw_pe.free_q */
+    TW_pe_sevent_q = 7,     /**< @brief In tw_pe.sevent_q */
+    TW_pe_free_q = 8,       /**< @brief In tw_pe.free_q */
 #ifdef USE_RIO
-    IO_buffer = 10,         /**< @brief RIO captured event */
+    IO_buffer = 9,         /**< @brief RIO captured event */
 #endif
 };
 typedef enum tw_event_owner tw_event_owner;
@@ -270,7 +269,7 @@ struct tw_event {
         unsigned char owner;        /**< @brief Owner of the next/prev pointers; see tw_event_owner */
         unsigned char cancel_q;     /**< @brief Actively on a dest_lp->pe's cancel_q */
         unsigned char is_rescinded; /**< @brief True if event is sitting in someone's rescind list */
-        unsigned char cancel_asend;
+        unsigned char remote_queue;  /**< @brief True if positive event is sitting in remote message queues */
         unsigned char remote;       /**< @brief Indicates union addr is in 'remote' storage */
     } state;
 

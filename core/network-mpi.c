@@ -1,5 +1,6 @@
 #include <ross.h>
 #include <mpi.h>
+#include <assert.h>
 
 MPI_Comm MPI_COMM_ROSS = MPI_COMM_WORLD;
 int custom_communicator = 0;
@@ -483,9 +484,8 @@ send_begin(tw_pe *me)
       }
 
       tw_eventq_pop(&outq);
-      e->state.owner = e->state.cancel_q
-	? TW_net_acancel
-	: TW_net_asend;
+      e->state.owner = TW_net_asend;
+      e->state.remote_queue = e->state.cancel_q ? 0 : 1;
 
       posted_sends.event_list[id] = e;
       posted_sends.cur++;
@@ -513,53 +513,34 @@ send_finish(tw_pe *me, tw_event *e, char * buffer)
   e->src_lp->kp->kp_stats->s_nsend_network++;
   e->src_lp->lp_stats->s_nsend_network++;
 
-  if (e->state.owner == TW_net_asend) {
-    if (e->state.cancel_asend) {
-      /* Event was cancelled during transmission.  We must
-       * send another message to pass the cancel flag to
-       * the other node.
-       */
-      e->state.cancel_asend = 0;
-      e->state.cancel_q = 1;
-      tw_eventq_push(&outq, e);
-    } else {
+  assert(e->state.owner == TW_net_asend);
+  e->state.owner = TW_pe_sevent_q;
+  if (e->state.cancel_q != e->state.remote_queue) {
       /* Event finished transmission and was not cancelled.
        * Add to our sent event queue so we can retain the
        * event in case we need to cancel it later.  Note it
        * is currently in remote format and must be converted
        * back to local format for fossil collection.
        */
-      e->state.owner = TW_pe_sevent_q;
-      if( g_tw_synchronization_protocol == CONSERVATIVE )
-	tw_event_free(me, e);
-    }
-
-    return;
+      if( g_tw_synchronization_protocol == CONSERVATIVE
+          /* Message is the lowest time and will not be rolled back */
+          ||
+          (e->state.cancel_q && ! e->state.is_rescinded)
+          /* We just finished sending the cancellation message
+           * for this event.  We need to free the buffer and
+           * make it available for reuse.
+           */
+         ) {
+           tw_event_free(me, e);
+      }
+  } else {
+      /* Event was cancellation state was changed during transmission.
+       * We must send another message to pass the flag to the other
+       * node.
+       */
+     tw_net_send(e);
+     return;
   }
-
-  if (e->state.owner == TW_net_acancel) {
-    /* We just finished sending the cancellation message
-     * for this event.  We need to free the buffer and
-     * make it available for reuse.
-     */
-    if (! e->state.is_rescinded) {
-      tw_event_free(me, e);
-    } else {
-      e->state.owner = TW_pe_sevent_q;
-    }
-    return;
-  }
-
-  /* Never should happen, not unless we somehow broke this
-   * module's other functions related to sending an event.
-   */
-
-  tw_error(
-	   TW_LOC,
-	   "Don't know how to finish send of owner=%u, cancel_q=%d",
-	   e->state.owner,
-	   e->state.cancel_q);
-
 }
 
 /**
@@ -594,76 +575,72 @@ tw_net_read(tw_pe *me)
 void
 tw_net_send(tw_event *e)
 {
-  tw_pe * me = e->src_lp->pe;
-  int changed = 0;
+   tw_pe * me = e->src_lp->pe;
+   int changed = 0;
 
-  //RCB FIXME-- if we cancel a rescind but the rescind hasn't been
-  //sent yet, we can just anniliate the rescind and this message.
-  e->state.remote = 0;
-  e->state.owner = TW_net_outq;
-  tw_eventq_unshift(&outq, e);
+   int shouldRecv=e->state.cancel_q;
+   int shouldSend=0;
+   if (e->state.owner == TW_net_asend) {
+      /* We've already let MPI start to send this event over
+       * the network.  We can't pull it back now without sending
+       * another message to do the cancel.
+       *
+       * Do nothing, message will be resent if necessary after send
+       * finishes.
+       */
+      shouldSend = 0;
+   } else if (e->state.owner == TW_net_outq) {
+      if (e->state.remote_queue != e->state.cancel_q) {
+         /* Previous send anihillated before we could transmit it.  Do not
+          * transmit the event and instead just release the
+          * buffer back into our own free list if necessary.
+          */
+         tw_eventq_delete_any(&outq, e);
+         e->state.owner = TW_pe_sevent_q;
+         if (e->state.cancel_q && ! e->state.is_rescinded)
+         {
+            tw_event_free(me, e);
+         }
+         shouldSend=0;
+      } else {
+         shouldSend=1;
+      }
+   } else if (e->state.owner == TW_pe_sevent_q) {
+      if (e->state.remote_queue == e->state.cancel_q) {
+         /* Way late; the event was already sent and is in our sent event
+          * queue.  Place it at the front of the outq.
+          */
+         e->state.owner = TW_net_outq;
+         tw_eventq_unshift(&outq, e);
+         shouldSend=1;
+      }
+      shouldSend=0;
+   } else {
+      /* First time this message is sent! */
+      assert(e->state.remote_queue == 0 && e->state.cancel_q==0);
+      e->state.remote = 0;
+     
+      e->state.owner = TW_net_outq;
+      tw_eventq_unshift(&outq, e);
+      shouldSend=1;
+   }
 
-  do
-    {
-      changed = test_q(&posted_sends, me, send_finish);
-      changed |= send_begin(me);
-    } while (changed);
+   if (shouldRecv) {
+      service_queues(me);
+   } else if (shouldSend) {
+      do
+      {
+         changed = test_q(&posted_sends, me, send_finish);
+         changed |= send_begin(me);
+      } while (changed);
+   }
 }
 
 void
 tw_net_cancel(tw_event *e)
 {
-  tw_pe *src_pe = e->src_lp->pe;
-
-  switch (e->state.owner) {
-  case TW_net_outq:
-    /* Cancelled before we could transmit it.  Do not
-     * transmit the event and instead just release the
-     * buffer back into our own free list.
-     */
-    tw_eventq_delete_any(&outq, e);
-    if (! e->state.is_rescinded) { //RCB Fix Owner
-       tw_event_free(src_pe, e);
-    }
-
-    return;
-
-    break;
-
-  case TW_net_asend:
-    /* Too late.  We've already let MPI start to send
-     * this event over the network.  We can't pull it
-     * back now without sending another message to do
-     * the cancel.
-     *
-     * Setting the cancel_q flag will signal us to do
-     * another message send once the current send of
-     * this message is completed.
-     */
-    e->state.cancel_asend = 1;
-    break;
-
-  case TW_pe_sevent_q:
-    /* Way late; the event was already sent and is in
-     * our sent event queue.  Mark it as a cancel and
-     * place it at the front of the outq.
-     */
-    e->state.cancel_q = 1;
-    tw_eventq_unshift(&outq, e);
-    break;
-
-  default:
-    /* Huh?  Where did you come from?  Why are we being
-     * told about you?  We did not send you so we cannot
-     * cancel you!
-     */
-    tw_error(
-	     TW_LOC,
-	     "Don't know how to cancel event owned by %u",
-	     e->state.owner);
-  }
-
-  service_queues(src_pe);
+   e->state.cancel_q = 1;
+   tw_net_send(e);
 }
 
 /**
