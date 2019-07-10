@@ -601,10 +601,9 @@ tw_net_send(tw_event *e)
          {
             tw_event_free(me, e);
          }
-         shouldSend=0;
-      } else {
-         shouldSend=1;
       }
+      shouldSend=0;
+      shouldRecv=0;
    } else if (e->state.owner == TW_pe_sevent_q) {
       if (e->state.remote_queue == e->state.cancel_q) {
          /* Way late; the event was already sent and is in our sent event
