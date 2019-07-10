@@ -54,7 +54,6 @@ static inline void event_send(tw_event* event) {
         */
         send_pe->stats.s_nsend_net_remote++;
         //event->src_lp->lp_stats->s_nsend_net_remote++;
-        event->state.owner = TW_net_asend;
         net_start = tw_clock_read();
         tw_net_send(event);
         send_pe->stats.s_net_other += tw_clock_read() - net_start;
