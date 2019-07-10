@@ -15,6 +15,10 @@ static inline void event_send(tw_event* event) {
     tw_peid        dest_peid = -1;
     tw_stime   recv_ts = event->recv_ts;
 
+     if (recv_ts >= g_tw_ts_end) {
+        return;
+    }
+    
     // call LP remote mapping function to get dest_pe
     dest_peid = (*src_lp->type->map) ((tw_lpid) event->dest_lp);
 
