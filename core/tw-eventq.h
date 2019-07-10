@@ -112,11 +112,17 @@ tw_eventq_push_list(tw_eventq * q, tw_event * h, tw_event * t, long cnt)
  
             while (cev)
             {
+               cev->state.is_rescinded = 0;
                next = cev->rescind_next;
                cev->rescind_next = NULL;
  
-               if(cev->state.owner == TW_pe_sevent_q) //RCB check me.
-                     tw_event_free(cev->src_lp->pe, cev);
+               if(1
+                  && cev->state.owner != TW_net_outq
+                  && cev->state.owner != TW_new_asend
+                  ) {
+                   tw_event_free(cev->src_lp->pe, cev);
+               }
+               
  
                cev = next;
             }
