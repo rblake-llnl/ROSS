@@ -118,7 +118,7 @@ tw_eventq_push_list(tw_eventq * q, tw_event * h, tw_event * t, long cnt)
  
                if(1
                   && cev->state.owner != TW_net_outq
-                  && cev->state.owner != TW_new_asend
+                  && cev->state.owner != TW_net_asend
                   ) {
                    tw_event_free(cev->src_lp->pe, cev);
                }
