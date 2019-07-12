@@ -496,6 +496,10 @@ send_begin(tw_pe *me)
   return changed;
 }
 
+void
+tw_net_symmetric_send(tw_event* e);
+
+
 /**
  * @brief Determines how to handle the buffer of event whose send operation
  * just finished.
@@ -515,7 +519,7 @@ send_finish(tw_pe *me, tw_event *e, char * buffer)
 
   assert(e->state.owner == TW_net_asend);
   e->state.owner = TW_pe_sevent_q;
-  if (e->state.cancel_q != e->state.remote_queue) {
+  if (e->state.cancel_update != e->state.remote_queue) {
       /* Event finished transmission and was not cancelled.
        * Add to our sent event queue so we can retain the
        * event in case we need to cancel it later.  Note it
@@ -538,7 +542,8 @@ send_finish(tw_pe *me, tw_event *e, char * buffer)
        * We must send another message to pass the flag to the other
        * node.
        */
-     tw_net_send(e);
+     e->state.cancel_q = e->state.cancel_update;
+     tw_net_symmetric_send(e);
      return;
   }
 }
@@ -574,6 +579,16 @@ tw_net_read(tw_pe *me)
 
 void
 tw_net_send(tw_event *e)
+{
+   if (e->state.owner != TW_net_asend) {
+      e->state.cancel_q = 0;
+   }
+   e->state.cancel_update = 0;
+   tw_net_symmetric_send(e);
+}
+
+void
+tw_net_symmetric_send(tw_event *e)
 {
    tw_pe * me = e->src_lp->pe;
    int changed = 0;
@@ -638,8 +653,11 @@ tw_net_send(tw_event *e)
 void
 tw_net_cancel(tw_event *e)
 {
-   e->state.cancel_q = 1;
-   tw_net_send(e);
+   if (e->state.owner != TW_net_asend) {
+      e->state.cancel_q = 1;
+   }
+   e->state.cancel_update = 1;
+   tw_net_symmetric_send(e);
 }
 
 /**

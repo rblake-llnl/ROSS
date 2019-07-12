@@ -270,6 +270,7 @@ struct tw_event {
         unsigned char cancel_q;     /**< @brief Actively on a dest_lp->pe's cancel_q */
         unsigned char is_rescinded; /**< @brief True if event is sitting in someone's rescind list */
         unsigned char remote_queue;  /**< @brief True if positive event is sitting in remote message queues */
+        unsigned char cancel_update; /**< @brief Should always be equal to cancel_q.  Only is different when we cancel/uncancel a message while it's in flight. */
         unsigned char remote;       /**< @brief Indicates union addr is in 'remote' storage */
     } state;
 
