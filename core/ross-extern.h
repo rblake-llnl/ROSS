@@ -82,6 +82,7 @@ extern unsigned long long g_tw_clock_rate;
 /*
  * tw-event.c
  */
+extern void tw_event_cancel(tw_event * event);
 extern void tw_event_send(tw_event * event);
 extern void tw_event_rollback(tw_event * event);
 
